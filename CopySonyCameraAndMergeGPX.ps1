@@ -183,16 +183,12 @@ foreach ($f in $files) {
     # get the files name  
     $fileName = $f.Name
 
-    # Only add a GPS point if one is set
-    if( $point -ne $null ) {   
-        $combLat = '-GPSLatitude*=' + $point.lat
-        $combLon = '-GPSLongitude*=' + $point.lon
-
-        .\exiftool.exe $combLat $f.FullName '-overwrite_original_in_place'
-        .\exiftool.exe $combLon $f.FullName '-overwrite_original_in_place'
-     }
 
     if ( [IO.Path]::GetExtension($fileName) -eq '.jpg' ) {
+        # Only add a GPS point if one is set
+        if( $point -ne $null ) {   
+            .\exiftool.exe `-GPSLatitude*=$point.lat `-GPSLongitude*=$point.lon $f.FullName -overwrite_original_in_place
+        }
         copyFileOfType -file $f -type "photos"
     }
     elseif ( [IO.Path]::GetExtension($fileName) -eq '.arw') {
