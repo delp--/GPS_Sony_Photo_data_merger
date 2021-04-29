@@ -1,4 +1,4 @@
-############
+ï»¿############
 # Funcs taken from - 
 # https://mnaoumov.wordpress.com/2015/01/11/get-exif-metadata-with-powershell/
 #############
@@ -83,14 +83,14 @@ function Get-DateTaken
 
 
 # SD Card location
-$inputDir = "E:\2021\4_20_Apr\forStiching\"
+$inputDir = "E:\GitHub\TestData\tmp\"
 
 # Where to output files with details.
 # Folder structure will be 
 # - year
 # -- m_d_mmm
 # --- type (eg photos)
-$outputDir = "E:\2021\4_20_Apr\forStiching\p\"
+$outputDir = "E:\GitHub\TestData\MemoryCardCopyOutput\"
 
 # Open GPS xml direct from eTrex 
 $gpxFile = "E:\GitHub\TestData\Current.gpx"
@@ -133,7 +133,8 @@ function copyFileOfType($file, $type) {
     # If it's not already copied, copy it
     if (-not (Test-Path $filePath)) { 
         Copy-Item $file.FullName -Destination $filePath
-        echo ("Copied " + $file.FullName)        
+        write-host("Copied " + $file.FullName )
+        #echo ("Copied " + $file.FullName)        
     }
 }
 
@@ -146,7 +147,7 @@ function getSelectedPoint($fileDate) {
         # This will be converted into you OS timezone with the below
         $dataPointTime = Get-Date $_.time
 
-        $diffInTime = New-TimeSpan –Start $dataPointTime –End $fileDate
+        $diffInTime = New-TimeSpan â€“Start $dataPointTime â€“End $fileDate
         $diffTimeInSeconds = $diffInTime.TotalSeconds
 
         if( $diffTimeInSeconds -lt 0) { # Strip -ve values
@@ -161,6 +162,7 @@ function getSelectedPoint($fileDate) {
 
     # If the time diff isn't set or it's to great to be accurate do not return a point
     if(( $lowestDiffInTime -eq $null ) -or ($lowestDiffInTime -gt 180)) {
+        write-host ("Point not found, time diff: $lowestDiffInTime using fileDate: $fileDate")
      return $null
     }    
     return $selectPoint
@@ -169,47 +171,76 @@ function getSelectedPoint($fileDate) {
 #This would be good to enter as a param - for now it's hard coded.
 # My camera is set to UTC/GMT time, so when I take photos in BST they are an hour behind
 # This makes sure GPS tracked time and photo time are synced up
-$photosTakenInBSTTimeZoneButCameraRecordingInUTC = $true
+$photosTakenInBSTTimeZoneButCameraRecordingInUTC = $false
 
+function getDateFromFile($file) {
+    $shellObject = New-Object -ComObject Shell.Application
+    $directoryObject = $shellObject.NameSpace( $file.Directory.FullName )
+    $fileObject = $directoryObject.ParseName( $file.Name )
+
+    $property = 'Date taken'
+    for(
+       $index = 5;
+       $directoryObject.GetDetailsOf( $directoryObject.Items, $index ) -ne $property;
+       ++$index ) { }
+
+    $value = $directoryObject.GetDetailsOf( $fileObject, $index )
+    $format= "dd/MM/yyyy HH:mm";
+    $formattedDateString = $value -replace '[^\p{L}\p{Nd}\:\/\ ]', ''
+
+    return $date1=[System.DateTime]::ParseExact($formattedDateString,$format, $null)
+}
 
 foreach ($f in $files) {   
     # get the files name  
     $fileName = $f.Name
-    echo "( [IO.Path]::GetExtension($fileName)"
 
     if (( [IO.Path]::GetExtension($fileName) -eq '.jpg' ) -or ([IO.Path]::GetExtension($fileName) -eq '.arw' ) -or ([IO.Path]::GetExtension($fileName) -eq '.mp4' )) {    
-        #get date of the file created
-        $date = Get-DateTaken -ImagePath $f.FullName 
+       
+        if([IO.Path]::GetExtension($fileName) -eq '.mp4' ) {        
+            $date = $f.LastWriteTime
+         } else {
+            $date = getDateFromFile -file $f
+         }
+
+       #get date of the file created
+       # $date2 = Get-DateTaken -ImagePath $f.FullName 
+
+       # $date3 = Get-LastWriteTime -ImagePath $f.FullName 
+        write-host( "date used for file: $fileName is: $date")
+
         if( $date -ne $null) {                  
             if($photosTakenInBSTTimeZoneButCameraRecordingInUTC) {
                 $date = $date.AddHours(1)
             }
-            echo ("Date for: $f.Name is: $date")
+            write-host( "Final Date for: $fileName is: $date")
             $point = getSelectedPoint -fileDate $date
-     
-           
+                
 
             # Only add a GPS point if one is set
             if( $point -ne $null ) {   
-                $combLat = '-GPSLatitude*=' + $point.lat
-                $combLon = '-GPSLongitude*=' + $point.lon
-                # .\exiftool.exe `-GPSLatitude*=$point.lat `-GPSLongitude*=$point.lon $f.FullName -overwrite_original_in_place
-                echo ("update with point data: " + $f.FullName)
-                .\exiftool.exe $combLat $f.FullName '-overwrite_original_in_place'
-                .\exiftool.exe $combLon $f.FullName '-overwrite_original_in_place'
+                $lat = $point.lat
+                $lon = $point.lon
+                $fullName = $f.FullName
+                 write-host( "Using point lat: $lat, lon: $lon, fullName: $fullName ")
+                #$combLat = '-GPSLatitude*=' + $point.lat
+                #$combLon = '-GPSLongitude*=' + $point.lon
+                .\exiftool.exe `-GPSLatitude*=$lat `-GPSLongitude*=$lon $fullName -overwrite_original_in_place               
              }
          } else {         
-            echo "Warning the date of the image ($fileName) is null, this will not work"   
+            write-host( "Warning the date of the image ($fileName) is null, this will not work")
          }
 
         if ( [IO.Path]::GetExtension($fileName) -eq '.jpg' ) {
-            echo ("copied: " + $f.FullName)
+            write-host ("copied: " + $f.FullName)
             copyFileOfType -file $f -type "photos"
         }
         elseif ( [IO.Path]::GetExtension($fileName) -eq '.arw') {
+            write-host ("copied: " + $f.FullName)
             copyFileOfType -file $f -type "raw"
         }
         elseif ( [IO.Path]::GetExtension($fileName) -eq '.mp4') {
+            write-host ("copied: " + $f.FullName)
             copyFileOfType -file $f -type "movies"
         }
         else {
