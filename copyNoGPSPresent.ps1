@@ -31,6 +31,7 @@ function Get-ExifProperty {
  
     PSUsing ($fs = [System.IO.File]::OpenRead($fullPath)) `
     {
+        write-host ("fs: $fs")
         PSUsing ($image = [System.Drawing.Image]::FromStream($fs, $false, $false)) `
         {
             if (-not $image.PropertyIdList.Contains($ExifTagCode)) {
@@ -43,6 +44,8 @@ function Get-ExifProperty {
             return $value
         }
     }
+    write-host ("Error -> dropping to return null")
+    return $null
 }
 
 # Taken from https://www.loc.gov/preservation/digital/formats/content/tiff_tags.shtml
@@ -92,6 +95,7 @@ $files = Get-ChildItem $inputDir -file -Recurse
 function copyFileOfType($file, $type) {
     # find when it was created
     $dateCreated = $file.CreationTime
+     write-host ("dateCreated: $dateCreated")
     # Build up a path to where the file should be copied to (e.g. 1_2_Jan) use numbers for ordering and inc month name to make reading easier.
     # make sure the day is in the format to be ordered, as in 
     $folderName = $outputDir + $dateCreated.Year + "\" + $dateCreated.Month + "_" + $dateCreated.Day + "_" + (Get-Culture).DateTimeFormat.GetAbbreviatedMonthName($dateCreated.Month) + "\" + $type + "\"

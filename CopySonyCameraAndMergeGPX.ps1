@@ -74,17 +74,17 @@ function Get-DateTaken {
 
 
 # SD Card location
-$inputDir = "E:\2021\4_20_Apr\forStiching\"
+$inputDir = "H:\"
 
 # Where to output files with details.
 # Folder structure will be 
 # - year
 # -- m_d_mmm
 # --- type (eg photos)
-$outputDir = "E:\2021\4_20_Apr\forStiching\p\"
+$outputDir = "e:\gps_afters_2021\2\"
 
 # Open GPS xml direct from eTrex 
-$gpxFile = "E:\GitHub\TestData\Current.gpx"
+$gpxFile = "J:\Garmin\GPX\Current\Current.gpx"
 # Pull out xml into var
 [xml]$xmlTrackData = Get-Content -Path $gpxFile
 
@@ -108,13 +108,21 @@ $files = Get-ChildItem $inputDir -file -Recurse
 
 
 # Create reusable func for chaning dir based on type
-function copyFileOfType($file, $type) {
-    # find when it was created
-    $dateCreated = $file.CreationTime
+function copyFileOfType($file, $type, $date) {
+    if( $date -eq $null ) {
+        # find when it was created
+        $dateCreated = $file.CreationTime
+    } 
+    else {
+        # find when it was created
+        $dateCreated = $date
+    }
+    
     # Build up a path to where the file should be copied to (e.g. 1_2_Jan) use numbers for ordering and inc month name to make reading easier.
     # make sure the day is in the format to be ordered, as in 
     $folderName = $outputDir + $dateCreated.Year + "\" + $dateCreated.Month + "_" + $dateCreated.Day + "_" + (Get-Culture).DateTimeFormat.GetAbbreviatedMonthName($dateCreated.Month) + "\" + $type + "\"
-	
+	write-host ("output folderName: $folderName")
+
     # Check if the folder exists, if it doesn't create it
     if (-not (Test-Path $folderName)) { 
         new-item $folderName -itemtype directory        
@@ -137,7 +145,7 @@ function getSelectedPoint($fileDate) {
         # This will be converted into you OS timezone with the below
         $dataPointTime = Get-Date $_.time
 
-        $diffInTime = New-TimeSpan �Start $dataPointTime �End $fileDate
+        $diffInTime = New-TimeSpan -Start $dataPointTime -End $fileDate
         $diffTimeInSeconds = $diffInTime.TotalSeconds
 
         if ( $diffTimeInSeconds -lt 0) {
@@ -169,12 +177,13 @@ foreach ($f in $files) {
     $fileName = $f.Name
     echo "( [IO.Path]::GetExtension($fileName)"
 
-    if (( [IO.Path]::GetExtension($fileName) -eq '.jpg' ) -or ([IO.Path]::GetExtension($fileName) -eq '.arw' ) -or ([IO.Path]::GetExtension($fileName) -eq '.mp4' )) {    
+    if (( [IO.Path]::GetExtension($fileName) -eq '.jpg' ) -or ( [IO.Path]::GetExtension($fileName) -eq '.png' ) -or ([IO.Path]::GetExtension($fileName) -eq '.arw' ) -or ([IO.Path]::GetExtension($fileName) -eq '.mp4' )) {    
         #get date of the file created
         $date = Get-DateTaken -ImagePath $f.FullName 
         if ( $date -ne $null) {                  
             if ($photosTakenInBSTTimeZoneButCameraRecordingInUTC) {
-                $date = $date.AddHours(1)
+                #$date = $date.AddHours(1)
+                $date = $date.AddSeconds(90)
             }
             echo ("Date for: $f.Name is: $date")
             $point = getSelectedPoint -fileDate $date
@@ -195,15 +204,15 @@ foreach ($f in $files) {
             echo "Warning the date of the image ($fileName) is null, this will not work"   
         }
 
-        if ( [IO.Path]::GetExtension($fileName) -eq '.jpg' ) {
+        if ( ( [IO.Path]::GetExtension($fileName) -eq '.jpg' ) -or ( [IO.Path]::GetExtension($fileName) -eq '.png' ) ) {
             echo ("copied: " + $f.FullName)
-            copyFileOfType -file $f -type "photos"
+            copyFileOfType -file $f -type "photos" -date $date
         }
         elseif ( [IO.Path]::GetExtension($fileName) -eq '.arw') {
-            copyFileOfType -file $f -type "raw"
+            copyFileOfType -file $f -type "raw" -date $date
         }
         elseif ( [IO.Path]::GetExtension($fileName) -eq '.mp4') {
-            copyFileOfType -file $f -type "movies"
+            copyFileOfType -file $f -type "movies" -date $date
         }
         else {
             #Do nothing
